@@ -1,0 +1,33 @@
+# Build
+.build/
+build/
+*.o
+*.swiftmodule
+*.swiftdoc
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Config (user-specific)
+config.toml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Dependencies (if not using SPM)
+Packages/
+Package.pins
+Package.resolved
+
+# Logs
+*.log
