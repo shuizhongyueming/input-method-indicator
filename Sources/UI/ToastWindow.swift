@@ -191,16 +191,29 @@ class ToastWindow: NSWindow {
         let screenFrame = screen.visibleFrame
         let width = CGFloat(config.width)
         let height = CGFloat(config.height)
+        let offsetX = CGFloat(config.offsetX)
         let offsetY = CGFloat(config.offsetY)
         
-        let x = screenFrame.midX - width / 2
-        let y: CGFloat
+        // 计算水平位置
+        let x: CGFloat
+        switch config.hPosition {
+        case .left:
+            x = screenFrame.minX + offsetX
+        case .center:
+            x = screenFrame.midX - width / 2 + offsetX
+        case .right:
+            x = screenFrame.maxX - width - offsetX
+        }
         
-        switch config.position {
-        case .bottomCenter:
-            y = screenFrame.minY + offsetY
-        case .topCenter:
+        // 计算垂直位置
+        let y: CGFloat
+        switch config.vPosition {
+        case .top:
             y = screenFrame.maxY - height - offsetY
+        case .center:
+            y = screenFrame.midY - height / 2 + offsetY
+        case .bottom:
+            y = screenFrame.minY + offsetY
         }
         
         return NSRect(x: x, y: y, width: width, height: height)

@@ -66,9 +66,11 @@ struct ConfigLoader {
             backgroundColor: toastTable["background_color"]?.string ?? "#2C2C2E",
             textColor: toastTable["text_color"]?.string ?? "#FFFFFF",
             accentColor: toastTable["accent_color"]?.string ?? "#0A84FF",
-            position: ToastConfig.ToastPosition(rawValue: toastTable["position"]?.string ?? "bottom_center") ?? .bottomCenter,
-            offsetY: toastTable["offset_y"]?.int ?? 16,
-            displayDuration: toastTable["display_duration"]?.double ?? 2.5,
+            hPosition: ToastConfig.HorizontalPosition(rawValue: toastTable["h_position"]?.string ?? "center") ?? .center,
+            vPosition: ToastConfig.VerticalPosition(rawValue: toastTable["v_position"]?.string ?? "bottom") ?? .bottom,
+            offsetX: toastTable["offset_x"]?.int ?? 0,
+            offsetY: toastTable["offset_y"]?.int ?? 20,
+            displayDuration: toastTable["display_duration"]?.double ?? 3.0,
             animationDuration: toastTable["animation_duration"]?.double ?? 0.2,
             showFlipButton: toastTable["show_flip_button"]?.bool ?? true,
             flipButtonText: toastTable["flip_button_text"]?.string ?? "切换"
@@ -139,15 +141,24 @@ struct ConfigLoader {
         background_color = "#2C2C2E"
         text_color = "#FFFFFF"
         accent_color = "#0A84FF"
-        position = "bottom_center"
+        
+        # Toast 位置配置（9宫格）
+        # 水平位置: left | center | right
+        # 垂直位置: top | center | bottom
+        h_position = "center"
+        v_position = "bottom"
+        
+        # 偏移量（像素）
+        offset_x = 0
         offset_y = 20
+        
         display_duration = 3.0
         animation_duration = 0.2
         show_flip_button = true
         flip_button_text = "切换"
 
         # 快速双 Shift 检测阈值（秒）
-        # 在离开微信输入法后，3 秒内再次按下 Shift 视为状态不同步，执行纠正切换
+        # 3 秒内两次 Shift 用于确认/纠正状态
         quick_double_shift_threshold = 3.0
 
         # 微信输入法 - 需要 detect_method = "shift_key"

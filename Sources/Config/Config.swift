@@ -45,16 +45,21 @@ struct ToastConfig: Codable {
     let backgroundColor: String
     let textColor: String
     let accentColor: String
-    let position: ToastPosition
-    let offsetY: Int
+    let hPosition: HorizontalPosition  // 水平位置: left, center, right
+    let vPosition: VerticalPosition    // 垂直位置: top, center, bottom
+    let offsetX: Int                   // 水平偏移
+    let offsetY: Int                   // 垂直偏移
     let displayDuration: Double
     let animationDuration: Double
     let showFlipButton: Bool
     let flipButtonText: String
     
-    enum ToastPosition: String, Codable {
-        case bottomCenter = "bottom_center"
-        case topCenter = "top_center"
+    enum HorizontalPosition: String, Codable {
+        case left, center, right
+    }
+    
+    enum VerticalPosition: String, Codable {
+        case top, center, bottom
     }
     
     static let `default` = ToastConfig(
@@ -65,9 +70,11 @@ struct ToastConfig: Codable {
         backgroundColor: "#2C2C2E",
         textColor: "#FFFFFF",
         accentColor: "#0A84FF",
-        position: .bottomCenter,
-        offsetY: 16,
-        displayDuration: 2.5,
+        hPosition: .center,
+        vPosition: .bottom,
+        offsetX: 0,
+        offsetY: 20,
+        displayDuration: 3.0,
         animationDuration: 0.2,
         showFlipButton: true,
         flipButtonText: "切换"

@@ -288,6 +288,10 @@ class WeTypeDetector: InputMethodDetector {
         // 这表示"用户确认想要当前显示的状态"
         Logger.logToggle(to: isChineseMode, type: .quickDoubleShiftConfirm, component: "WeType")
         onStateChange?(currentState)
+        
+        // 关键：重置 lastToggleTime，这样下一次 Shift 就是正常单击切换
+        lastToggleTime = nil
+        Logger.log("状态已确认，重置切换计时器", component: "WeType")
     }
     
     private func scheduleToggle() {
