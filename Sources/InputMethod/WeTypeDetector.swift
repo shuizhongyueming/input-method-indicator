@@ -3,7 +3,7 @@ import Cocoa
 import CoreGraphics
 
 /// 微信输入法状态检测器
-/// 支持：单击切换、双击切换输入法、三秒内两次Shift确认状态
+/// 支持：单击立即切换、快速双Shift确认状态
 @MainActor
 class WeTypeDetector: InputMethodDetector {
     
@@ -31,16 +31,8 @@ class WeTypeDetector: InputMethodDetector {
     private var shiftUsedAsModifier: Bool = false
     private var keysPressedDuringShift: Set<Int64> = []
     
-    // 双击检测（用于切换输入法）
-    private var lastShiftReleaseTime: Date?
-    private var pendingToggleTimer: Timer?
-    private let doubleClickThreshold: TimeInterval = 0.3
-    
-    // 快速双 Shift 检测（用于状态确认/纠正）
-    private var lastToggleTime: Date?
-    
-    // 标记是否是双击导致的输入法切换
-    private var isDoubleClickSwitching: Bool = false
+    // 快速双 Shift 检测（用于状态确认）
+    private var lastShiftTime: Date?
     
     // 状态持久化
     private var lastWeTypeChineseMode: Bool = true
@@ -61,13 +53,11 @@ class WeTypeDetector: InputMethodDetector {
         }
         
         setupEventTap()
-        Logger.log("开始监听 Shift 键 (快速双Shift阈值: \(quickDoubleShiftThreshold)s，功能: 状态确认)", component: "WeType")
+        Logger.log("开始监听 Shift 键 (单击立即切换，双Shift确认状态)", component: "WeType")
     }
     
     func stop() {
         stopListening()
-        pendingToggleTimer?.invalidate()
-        pendingToggleTimer = nil
     }
     
     /// 手动翻转状态（Toast 按钮点击）
@@ -120,11 +110,6 @@ class WeTypeDetector: InputMethodDetector {
                 // 离开微信输入法
                 lastWeTypeChineseMode = isChineseMode
                 Logger.logInputSource(action: "离开", source: "微信输入法", mode: isChineseMode ? "中文" : "英文", component: "WeType")
-                
-                if isDoubleClickSwitching {
-                    Logger.log("双击导致的离开，隐藏 Toast", component: "WeType")
-                    isDoubleClickSwitching = false
-                }
             }
         }
     }
@@ -199,13 +184,6 @@ class WeTypeDetector: InputMethodDetector {
         
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         
-        // 如果正在等待单击确认时，又按下了 Shift，认为是双击的开始
-        if (keyCode == 56 || keyCode == 60) && pendingToggleTimer != nil {
-            cancelPendingToggle()
-            Logger.log("检测到双击 Shift，取消模式切换", component: "WeType")
-            return
-        }
-        
         if shiftPressed {
             keysPressedDuringShift.insert(keyCode)
             if keyCode != 56 && keyCode != 60 {
@@ -250,31 +228,18 @@ class WeTypeDetector: InputMethodDetector {
     private func handleShiftRelease() {
         let now = Date()
         
-        // 检查是否是双击（300ms 内）- 用于切换输入法
-        if let lastRelease = lastShiftReleaseTime,
-           now.timeIntervalSince(lastRelease) < doubleClickThreshold {
-            // 双击 - 标记为输入法切换，不触发模式切换
-            isDoubleClickSwitching = true
-            Logger.log("双击 Shift - 用于切换输入法", component: "WeType")
-            cancelPendingToggle()
-            lastShiftReleaseTime = nil
-            return
-        }
-        
-        // 检查是否是快速双 Shift（3秒内第二次单击，用于状态确认/纠正）
-        if let lastToggle = lastToggleTime,
-           now.timeIntervalSince(lastToggle) < quickDoubleShiftThreshold {
-            // 快速双 Shift - 确认并保持当前状态，不切换
-            // 这用于处理状态不同步的情况：用户发现状态不对，快速按两次Shift来确认想要的状态
-            Logger.log("快速双 Shift 检测（\(String(format: "%.1f", now.timeIntervalSince(lastToggle)))s），确认当前状态", component: "WeType")
+        // 检查是否是快速双 Shift（3秒内第二次，用于状态确认）
+        if let lastTime = lastShiftTime,
+           now.timeIntervalSince(lastTime) < quickDoubleShiftThreshold {
+            // 快速双 Shift - 确认并保持当前状态
+            Logger.log("快速双 Shift 检测（\(String(format: "%.1f", now.timeIntervalSince(lastTime)))s），确认当前状态", component: "WeType")
             confirmCurrentState()
-            lastShiftReleaseTime = now
             return
         }
         
-        // 普通单击 - 延迟执行以检测双击
-        scheduleToggle()
-        lastShiftReleaseTime = now
+        // 普通单击 - 立即切换（无延迟）
+        lastShiftTime = now
+        executeToggle()
     }
     
     /// 确认并保持当前状态（快速双Shift功能）
@@ -285,34 +250,16 @@ class WeTypeDetector: InputMethodDetector {
         }
         
         // 不切换状态，只是重新触发通知以刷新显示
-        // 这表示"用户确认想要当前显示的状态"
         Logger.logToggle(to: isChineseMode, type: .quickDoubleShiftConfirm, component: "WeType")
         onStateChange?(currentState)
         
-        // 关键：重置 lastToggleTime，这样下一次 Shift 就是正常单击切换
-        lastToggleTime = nil
-        Logger.log("状态已确认，重置切换计时器", component: "WeType")
-    }
-    
-    private func scheduleToggle() {
-        cancelPendingToggle()
-        
-        pendingToggleTimer = Timer.scheduledTimer(withTimeInterval: doubleClickThreshold, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            self.executeToggle()
-        }
-    }
-    
-    private func cancelPendingToggle() {
-        pendingToggleTimer?.invalidate()
-        pendingToggleTimer = nil
+        // 关键：重置 lastShiftTime，这样下一次 Shift 就是正常单击切换
+        lastShiftTime = nil
+        Logger.log("状态已确认，重置计时器", component: "WeType")
     }
     
     /// 执行实际的切换（在微信输入法内单击 Shift）
     private func executeToggle() {
-        pendingToggleTimer = nil
-        lastToggleTime = Date()
-        
         guard isWeTypeActive else {
             Logger.log("切换时已离开微信输入法，跳过", component: "WeType")
             return
