@@ -18,8 +18,9 @@ class WeTypeDetector: InputMethodDetector {
     /// 推断的中文状态（true=中文，false=英文）
     private(set) var isChineseMode: Bool = true
     
-    /// 快速双 Shift 阈值（秒）
-    var quickDoubleShiftThreshold: TimeInterval = 3.0
+    /// 快速双 Shift 阈值（秒）- 默认 0.5 秒
+    /// 小于此间隔的双击被视为"确认状态"，大于此间隔被视为两次独立单击
+    var quickDoubleShiftThreshold: TimeInterval = 0.5
     
     private let weTypeBundleID = "com.tencent.inputmethod.wetype"
     
@@ -236,19 +237,12 @@ class WeTypeDetector: InputMethodDetector {
     private func handleShiftRelease() {
         let now = Date()
         
-        // 检查是否在冷却期内（刚确认过状态，防止误触发）
-        if let cooldown = confirmationCooldownUntil,
-           now < cooldown {
-            Logger.log("冷却期内，忽略Shift", component: "WeType")
-            return
-        }
-        confirmationCooldownUntil = nil
-        
-        // 检查是否是快速双 Shift（3秒内第二次，用于状态确认）
+        // 检查是否是快速双 Shift（0.5秒内第二次，用于状态确认）
+        // 阈值较短，方便区分"快速双击确认"和"单击后等一下再单击切换"
         if let lastTime = lastShiftTime,
            now.timeIntervalSince(lastTime) < quickDoubleShiftThreshold {
             // 快速双 Shift - 确认并保持当前状态
-            Logger.log("快速双 Shift 检测（\(String(format: "%.1f", now.timeIntervalSince(lastTime)))s），确认当前状态", component: "WeType")
+            Logger.log("快速双 Shift 检测（\(String(format: "%.2f", now.timeIntervalSince(lastTime)))s），确认当前状态", component: "WeType")
             confirmCurrentState()
             return
         }
@@ -257,9 +251,6 @@ class WeTypeDetector: InputMethodDetector {
         lastShiftTime = now
         executeToggle()
     }
-    
-    /// 快速双 Shift 的冷却期，防止误触发
-    private var confirmationCooldownUntil: Date?
     
     /// 确认并保持当前状态（快速双Shift功能）
     private func confirmCurrentState() {
@@ -275,10 +266,7 @@ class WeTypeDetector: InputMethodDetector {
         // 关键：重置 lastShiftTime，这样下一次 Shift 就是正常单击切换
         lastShiftTime = nil
         
-        // 设置冷却期 0.8 秒，防止紧接着的第三次 Shift 误触发切换
-        confirmationCooldownUntil = Date().addingTimeInterval(0.8)
-        
-        Logger.log("状态已确认，0.8秒内忽略下一次Shift", component: "WeType")
+        Logger.log("状态已确认", component: "WeType")
     }
     
     /// 执行实际的切换（在微信输入法内单击 Shift）
