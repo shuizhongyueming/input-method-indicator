@@ -35,7 +35,15 @@ class WeTypeDetector: InputMethodDetector {
     private var lastShiftTime: Date?
     
     // 状态持久化
-    private var lastWeTypeChineseMode: Bool = true
+    private let stateKey = "com.imi.wetype.lastChineseMode"
+    private var lastWeTypeChineseMode: Bool {
+        get {
+            UserDefaults.standard.object(forKey: stateKey) as? Bool ?? true
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: stateKey)
+        }
+    }
     
     init() {
         checkCurrentInputSource()
@@ -228,6 +236,14 @@ class WeTypeDetector: InputMethodDetector {
     private func handleShiftRelease() {
         let now = Date()
         
+        // 检查是否在冷却期内（刚确认过状态，防止误触发）
+        if let cooldown = confirmationCooldownUntil,
+           now < cooldown {
+            Logger.log("冷却期内，忽略Shift", component: "WeType")
+            return
+        }
+        confirmationCooldownUntil = nil
+        
         // 检查是否是快速双 Shift（3秒内第二次，用于状态确认）
         if let lastTime = lastShiftTime,
            now.timeIntervalSince(lastTime) < quickDoubleShiftThreshold {
@@ -242,6 +258,9 @@ class WeTypeDetector: InputMethodDetector {
         executeToggle()
     }
     
+    /// 快速双 Shift 的冷却期，防止误触发
+    private var confirmationCooldownUntil: Date?
+    
     /// 确认并保持当前状态（快速双Shift功能）
     private func confirmCurrentState() {
         guard isWeTypeActive else {
@@ -255,7 +274,11 @@ class WeTypeDetector: InputMethodDetector {
         
         // 关键：重置 lastShiftTime，这样下一次 Shift 就是正常单击切换
         lastShiftTime = nil
-        Logger.log("状态已确认，重置计时器", component: "WeType")
+        
+        // 设置冷却期 0.8 秒，防止紧接着的第三次 Shift 误触发切换
+        confirmationCooldownUntil = Date().addingTimeInterval(0.8)
+        
+        Logger.log("状态已确认，0.8秒内忽略下一次Shift", component: "WeType")
     }
     
     /// 执行实际的切换（在微信输入法内单击 Shift）
